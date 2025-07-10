@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gallery{% endblock %}</title>
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Custom CSS for masonry layout -->
+    <style>
+        .masonry {
+            column-count: 4;
+            column-gap: 1rem;
+            column-fill: balance;
+        }
+        
+        .masonry-item {
+            break-inside: avoid;
+            margin-bottom: 1rem;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        @media (max-width: 1024px) {
+            .masonry {
+                column-count: 3;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .masonry {
+                column-count: 2;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .masonry {
+                column-count: 1;
+            }
+        }
+        
+        .drop-zone {
+            border: 3px dashed #cbd5e0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .drop-zone.dragover {
+            border-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+        
+        .file-preview {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold text-gray-800">Gallery</h1>
+                </div>
+                <div class="flex space-x-4">
+                    <a href="/" class="text-blue-600 hover:text-blue-800 font-medium">Gallery</a>
+                    <a href="/random" class="text-blue-600 hover:text-blue-800 font-medium">Random Viewer</a>
+                    <a href="/compare" class="text-blue-600 hover:text-blue-800 font-medium">Compare</a>
+                    <a href="/adventure" class="text-blue-600 hover:text-blue-800 font-medium">Adventure</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <!-- HTMX indicators -->
+    <div id="loading-indicator" class="htmx-indicator fixed top-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg">
+        Loading...
+    </div>
+    
+    <script>
+        // Global upload function - defined once to prevent duplicates
+        function uploadFiles(files) {
+            if (files.length === 0) return;
+            
+            // Check file sizes before uploading
+            const maxFileSize = 2 * 1024 * 1024 * 1024; // 2GB
+            const oversizedFiles = [];
+            const validFiles = [];
+            
+            Array.from(files).forEach(file => {
+                if (file.size > maxFileSize) {
+                    oversizedFiles.push(`${file.name} (${(file.size / (1024*1024)).toFixed(1)}MB)`);
+                } else {
+                    validFiles.push(file);
+                }
+            });
+            
+            if (oversizedFiles.length > 0) {
+                showMessage(`Files too large (max 2GB): ${oversizedFiles.join(', ')}`, 'error');
+            }
+            
+            if (validFiles.length === 0) {
+                return; // No valid files to upload
+            }
+            
+            const formData = new FormData();
+            validFiles.forEach(file => formData.append('files[]', file));
+            
+            // Show loading message
+            showMessage('Uploading files...', 'info');
+            
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage(data.message, 'success');
+                    // Trigger gallery refresh using HTMX
+                    const galleryContainer = document.getElementById('gallery-grid');
+                    if (galleryContainer && typeof htmx !== 'undefined') {
+                        htmx.trigger(galleryContainer, 'refresh-gallery');
+                    } else {
+                        // Fallback: reload page
+                        setTimeout(() => window.location.reload(), 1000);
+                    }
+                } else {
+                    showMessage(data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Upload failed: ' + error.message, 'error');
+                console.error('Upload error:', error);
+            });
+        }
+
+        // File upload drag and drop functionality
+        function setupDropZone() {
+            const dropZone = document.getElementById('drop-zone');
+            if (!dropZone) return;
+            
+            // Remove existing listeners to prevent duplicates
+            dropZone.removeEventListener('drop', dropZone._dropHandler);
+            dropZone.removeEventListener('click', dropZone._clickHandler);
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+                document.body.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+            
+            // Store handler reference for cleanup
+            dropZone._dropHandler = handleDrop;
+            dropZone.addEventListener('drop', handleDrop, false);
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            function highlight(e) {
+                dropZone.classList.add('dragover');
+            }
+            
+            function unhighlight(e) {
+                dropZone.classList.remove('dragover');
+            }
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                uploadFiles(files);
+            }
+        }
+        
+        function showMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `fixed top-4 left-4 px-4 py-2 rounded-lg shadow-lg ${
+                type === 'success' ? 'bg-green-500' : 'bg-red-500'
+            } text-white z-50`;
+            messageDiv.textContent = text;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+        
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', setupDropZone);
+        
+        // Re-initialize after HTMX updates, but avoid duplicates
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            if (event.target.id === 'gallery-grid') {
+                setupDropZone();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,508 @@
+{% extends "base.html" %}
+
+{% block title %}Adventure - Gallery{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div class="text-center">
+        <h2 class="text-3xl font-bold text-gray-800 mb-2">Adventure Mode</h2>
+        <p class="text-gray-600">Set your parameters and embark on a media adventure!</p>
+    </div>
+    
+    <!-- Configuration Panel -->
+    <div id="config-panel" class="bg-white rounded-lg shadow-md p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Popularity Level -->
+            <div class="space-y-3">
+                <label class="block text-sm font-medium text-gray-700">Popularity Level</label>
+                <div class="space-y-2">
+                    <input type="range" id="popularity-level" 
+                           min="{{ min_likes }}" max="{{ max_likes }}" value="{{ min_likes }}" 
+                           class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    <div class="flex justify-between text-xs text-gray-500">
+                        <span>{{ min_likes }}</span>
+                        <span id="popularity-value">{{ min_likes }}</span>
+                        <span>{{ max_likes }}</span>
+                    </div>
+                    <p class="text-xs text-gray-600">Only show media with likes ≥ this value</p>
+                </div>
+            </div>
+            
+            <!-- Steps -->
+            <div class="space-y-3">
+                <label class="block text-sm font-medium text-gray-700">Number of Steps</label>
+                <input type="number" id="steps" min="1" max="100" value="8" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-600">Total number of media to show</p>
+            </div>
+            
+            <!-- File Type -->
+            <div class="space-y-3">
+                <label class="block text-sm font-medium text-gray-700">File Type</label>
+                <select id="file-type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="both">Images & Videos</option>
+                    <option value="image">Images Only</option>
+                    <option value="video">Videos Only</option>
+                </select>
+                <p class="text-xs text-gray-600">Type of media to include</p>
+            </div>
+            
+            <!-- Start Button -->
+            <div class="space-y-3">
+                <label class="block text-sm font-medium text-gray-700">Ready?</label>
+                <button id="start-adventure" 
+                        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200">
+                    Start Adventure
+                </button>
+                <p class="text-xs text-gray-600">Begin your media journey!</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Adventure Display -->
+    <div id="adventure-display" class="hidden">
+        <!-- Progress Bar -->
+        <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-gray-700">Progress</span>
+                <span id="progress-text" class="text-sm text-gray-600">1 / 8</span>
+            </div>
+            <div class="w-full bg-gray-200 rounded-full h-2">
+                <div id="progress-bar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+        
+        <!-- Media Display -->
+        <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+            <div id="media-container" class="aspect-square bg-gray-100 flex items-center justify-center relative cursor-pointer">
+                <!-- Media will be displayed here -->
+                <div class="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-2 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Media Info -->
+            <div id="media-info" class="p-6 text-center">
+                <h3 id="media-title" class="text-lg font-semibold text-gray-800 mb-2"></h3>
+                <div class="space-y-2">
+                    <div class="flex justify-center items-center space-x-2 text-sm text-gray-600">
+                        <span id="media-type" class="capitalize"></span>
+                        <span class="text-gray-400">•</span>
+                        <span id="media-date"></span>
+                    </div>
+                    <div class="flex justify-center items-center space-x-1">
+                        <svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/>
+                        </svg>
+                        <span id="media-likes" class="font-semibold"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Control Buttons -->
+        <div class="mt-6 text-center space-x-4">
+            <button id="pause-adventure" class="bg-yellow-600 text-white py-2 px-6 rounded-md hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-yellow-500 transition-colors duration-200">
+                Pause
+            </button>
+            <button id="stop-adventure" class="bg-red-600 text-white py-2 px-6 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-colors duration-200">
+                Stop Adventure
+            </button>
+        </div>
+    </div>
+    
+    <!-- Adventure Complete -->
+    <div id="adventure-complete" class="hidden bg-green-50 border border-green-200 rounded-lg p-6 text-center">
+        <div class="flex items-center justify-center space-x-2 text-green-700 mb-4">
+            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <h3 class="text-xl font-semibold">Adventure Complete!</h3>
+        </div>
+        <p class="text-green-600 mb-4">You've successfully completed your media adventure.</p>
+        <button id="new-adventure" class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-200">
+            Start New Adventure
+        </button>
+    </div>
+</div>
+
+<!-- Fullscreen Modal -->
+<div id="fullscreen-modal" class="fixed inset-0 bg-black bg-opacity-90 hidden z-50 flex items-center justify-center">
+    <div class="relative w-full h-full flex items-center justify-center p-4">
+        <!-- Close Button -->
+        <button onclick="closeFullscreen()" class="absolute top-4 right-4 z-60 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70 transition-all duration-200">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+        
+        <!-- Media Container -->
+        <div id="fullscreen-media" class="max-w-full max-h-full flex items-center justify-center">
+            <!-- Fullscreen media will be displayed here -->
+        </div>
+        
+        <!-- Media Info Overlay -->
+        <div class="absolute bottom-4 left-4 right-4 bg-black bg-opacity-70 text-white p-4 rounded-lg">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between space-y-2 sm:space-y-0">
+                <div>
+                    <h3 id="fullscreen-title" class="text-lg font-semibold mb-1"></h3>
+                    <div class="flex items-center space-x-4 text-sm text-gray-300">
+                        <span id="fullscreen-type" class="capitalize"></span>
+                        <span id="fullscreen-date"></span>
+                        <div class="flex items-center space-x-1">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/>
+                            </svg>
+                            <span id="fullscreen-likes" class="font-semibold"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let adventureData = null;
+    let currentStep = 0;
+    let adventureTimer = null;
+    let isPaused = false;
+    let currentVideo = null;
+    let currentFile = null;
+    
+    // Update popularity level display
+    document.getElementById('popularity-level').addEventListener('input', function() {
+        document.getElementById('popularity-value').textContent = this.value;
+    });
+    
+    // Start adventure
+    document.getElementById('start-adventure').addEventListener('click', function() {
+        const popularityLevel = document.getElementById('popularity-level').value;
+        const steps = document.getElementById('steps').value;
+        const fileType = document.getElementById('file-type').value;
+        
+        // Validate steps input
+        const stepsNum = parseInt(steps);
+        if (isNaN(stepsNum) || stepsNum < 1 || stepsNum > 100) {
+            showMessage('Please enter a valid number of steps (1-100)', 'error');
+            return;
+        }
+        
+        const params = {
+            risk_level: parseInt(popularityLevel),
+            steps: stepsNum,
+            file_type: fileType
+        };
+        
+        fetch('/api/adventure-start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(params)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                adventureData = data;
+                currentStep = 0;
+                isPaused = false;
+                startAdventure();
+            } else {
+                showMessage(data.error || 'Failed to start adventure', 'error');
+            }
+        })
+        .catch(error => {
+            showMessage('Error starting adventure', 'error');
+            console.error('Error:', error);
+        });
+    });
+    
+    function startAdventure() {
+        document.getElementById('config-panel').classList.add('hidden');
+        document.getElementById('adventure-display').classList.remove('hidden');
+        document.getElementById('adventure-complete').classList.add('hidden');
+        
+        showNextMedia();
+    }
+    
+    function showNextMedia() {
+        if (currentStep >= adventureData.files.length) {
+            completeAdventure();
+            return;
+        }
+        
+        const file = adventureData.files[currentStep];
+        currentFile = file; // Store current file for fullscreen
+        
+        // Update progress
+        const progress = ((currentStep + 1) / adventureData.total_steps) * 100;
+        document.getElementById('progress-bar').style.width = progress + '%';
+        document.getElementById('progress-text').textContent = `${currentStep + 1} / ${adventureData.total_steps}`;
+        
+        // Update media info
+        document.getElementById('media-title').textContent = file.original_filename;
+        document.getElementById('media-type').textContent = file.file_type;
+        document.getElementById('media-date').textContent = file.created_at;
+        document.getElementById('media-likes').textContent = file.like_count;
+        document.getElementById('media-likes').className = `font-semibold ${file.like_count > 0 ? 'text-green-600' : file.like_count < 0 ? 'text-red-600' : 'text-gray-600'}`;
+        
+        // Display media
+        const mediaContainer = document.getElementById('media-container');
+        
+        // Set up fullscreen click handler for this specific file
+        mediaContainer.onclick = function() {
+            openFullscreen(file);
+        };
+        
+        // Update fullscreen modal content if it's currently open
+        const modal = document.getElementById('fullscreen-modal');
+        if (!modal.classList.contains('hidden')) {
+            updateFullscreenContent(file);
+        }
+        
+        if (file.file_type === 'image') {
+            mediaContainer.innerHTML = `
+                <img src="/uploads/${file.filename}" 
+                     alt="${file.original_filename}" 
+                     class="w-full h-full object-contain">
+                <div class="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-2 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    </svg>
+                </div>
+            `;
+            
+            // Show image for 3 seconds
+            if (!isPaused) {
+                adventureTimer = setTimeout(() => {
+                    currentStep++;
+                    showNextMedia();
+                }, 3000);
+            }
+        } else if (file.file_type === 'video') {
+            mediaContainer.innerHTML = `
+                <video id="adventure-video" 
+                       class="w-full h-full object-contain" 
+                       controls autoplay muted>
+                    <source src="/uploads/${file.filename}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <div class="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-2 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    </svg>
+                </div>
+            `;
+            
+            currentVideo = document.getElementById('adventure-video');
+            currentVideo.addEventListener('ended', () => {
+                if (!isPaused) {
+                    currentStep++;
+                    showNextMedia();
+                }
+            });
+        }
+    }
+    
+    function completeAdventure() {
+        document.getElementById('adventure-display').classList.add('hidden');
+        document.getElementById('adventure-complete').classList.remove('hidden');
+        
+        // Clear any timers
+        if (adventureTimer) {
+            clearTimeout(adventureTimer);
+        }
+    }
+    
+    // Pause/Resume functionality
+    document.getElementById('pause-adventure').addEventListener('click', function() {
+        if (isPaused) {
+            // Resume
+            isPaused = false;
+            this.textContent = 'Pause';
+            this.className = this.className.replace('bg-green-600 hover:bg-green-700', 'bg-yellow-600 hover:bg-yellow-700');
+            
+            if (currentVideo) {
+                currentVideo.play();
+            } else {
+                // Resume image timer
+                adventureTimer = setTimeout(() => {
+                    currentStep++;
+                    showNextMedia();
+                }, 3000);
+            }
+        } else {
+            // Pause
+            isPaused = true;
+            this.textContent = 'Resume';
+            this.className = this.className.replace('bg-yellow-600 hover:bg-yellow-700', 'bg-green-600 hover:bg-green-700');
+            
+            if (currentVideo) {
+                currentVideo.pause();
+            } else {
+                // Clear image timer
+                if (adventureTimer) {
+                    clearTimeout(adventureTimer);
+                }
+            }
+        }
+    });
+    
+    // Stop adventure
+    document.getElementById('stop-adventure').addEventListener('click', function() {
+        document.getElementById('adventure-display').classList.add('hidden');
+        document.getElementById('config-panel').classList.remove('hidden');
+        
+        // Clear any timers
+        if (adventureTimer) {
+            clearTimeout(adventureTimer);
+        }
+        
+        // Reset pause button
+        const pauseBtn = document.getElementById('pause-adventure');
+        pauseBtn.textContent = 'Pause';
+        pauseBtn.className = pauseBtn.className.replace('bg-green-600 hover:bg-green-700', 'bg-yellow-600 hover:bg-yellow-700');
+        isPaused = false;
+    });
+    
+    // New adventure
+    document.getElementById('new-adventure').addEventListener('click', function() {
+        document.getElementById('adventure-complete').classList.add('hidden');
+        document.getElementById('config-panel').classList.remove('hidden');
+    });
+    
+    // Fullscreen functionality
+    function updateFullscreenContent(file) {
+        if (!file) {
+            console.log('No file provided to updateFullscreenContent');
+            return;
+        }
+        
+        console.log('Updating fullscreen content for:', file.original_filename);
+        
+        const mediaContainer = document.getElementById('fullscreen-media');
+        
+        // Clear previous content
+        mediaContainer.innerHTML = '';
+        
+        // Update fullscreen info
+        document.getElementById('fullscreen-title').textContent = file.original_filename;
+        document.getElementById('fullscreen-type').textContent = file.file_type;
+        document.getElementById('fullscreen-date').textContent = file.created_at;
+        document.getElementById('fullscreen-likes').textContent = file.like_count;
+        document.getElementById('fullscreen-likes').className = `font-semibold ${file.like_count > 0 ? 'text-green-300' : file.like_count < 0 ? 'text-red-300' : 'text-gray-300'}`;
+        
+        // Display media in fullscreen
+        if (file.file_type === 'image') {
+            mediaContainer.innerHTML = `
+                <img src="/uploads/${file.filename}" 
+                     alt="${file.original_filename}" 
+                     class="max-w-full max-h-full object-contain">
+            `;
+        } else if (file.file_type === 'video') {
+            mediaContainer.innerHTML = `
+                <video class="max-w-full max-h-full object-contain" 
+                       controls autoplay muted>
+                    <source src="/uploads/${file.filename}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            `;
+        }
+    }
+    
+    function openFullscreen(file) {
+        if (!file) {
+            console.log('No file provided to openFullscreen');
+            return;
+        }
+        
+        console.log('Opening fullscreen for:', file.original_filename);
+        
+        const modal = document.getElementById('fullscreen-modal');
+        
+        // Update content
+        updateFullscreenContent(file);
+        
+        // Show modal
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    
+    function closeFullscreen() {
+        document.getElementById('fullscreen-modal').classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+    
+    // Alternative: Full-width view (uncomment to use instead of modal)
+    /*
+    function openFullscreen(file) {
+        if (!file) return;
+        
+        const mediaContainer = document.getElementById('media-container');
+        const adventureDisplay = document.getElementById('adventure-display');
+        
+        // Toggle full-width class
+        if (mediaContainer.classList.contains('fullwidth-mode')) {
+            // Exit fullwidth mode
+            mediaContainer.classList.remove('fullwidth-mode', 'fixed', 'inset-0', 'z-50', 'bg-black');
+            mediaContainer.classList.add('aspect-square', 'bg-gray-100');
+            adventureDisplay.classList.remove('hidden');
+            document.body.style.overflow = 'auto';
+        } else {
+            // Enter fullwidth mode
+            mediaContainer.classList.add('fullwidth-mode', 'fixed', 'inset-0', 'z-50', 'bg-black');
+            mediaContainer.classList.remove('aspect-square', 'bg-gray-100');
+            adventureDisplay.classList.add('hidden');
+            document.body.style.overflow = 'hidden';
+            
+            // Update media to fit fullscreen
+            if (file.file_type === 'image') {
+                mediaContainer.innerHTML = `
+                    <img src="/uploads/${file.filename}" 
+                         alt="${file.original_filename}" 
+                         class="w-full h-full object-contain">
+                    <button onclick="openFullscreen(${JSON.stringify(file).replace(/"/g, '&quot;')})" 
+                            class="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                `;
+            } else if (file.file_type === 'video') {
+                mediaContainer.innerHTML = `
+                    <video class="w-full h-full object-contain" 
+                           controls autoplay muted>
+                        <source src="/uploads/${file.filename}" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <button onclick="openFullscreen(${JSON.stringify(file).replace(/"/g, '&quot;')})" 
+                            class="absolute top-4 right-4 bg-black bg-opacity-50 text-white p-3 rounded-full hover:bg-opacity-70">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                `;
+            }
+        }
+    }
+    */
+    
+    // Close fullscreen on escape key
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            closeFullscreen();
+        }
+    });
+    
+    // Close fullscreen when clicking outside the media
+    document.getElementById('fullscreen-modal').addEventListener('click', function(event) {
+        if (event.target === this) {
+            closeFullscreen();
+        }
+    });
+</script>
+{% endblock %}

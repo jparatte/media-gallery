@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+
+{% block title %}Compare - Gallery{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <!-- Header -->
+    <div class="text-center">
+        <h2 class="text-3xl font-bold text-gray-800 mb-2">File Comparison</h2>
+        <p class="text-gray-600">Choose your favorite between these two files!</p>
+    </div>
+    
+    <!-- Matching Types Toggle -->
+    <div class="bg-white rounded-lg shadow-md p-4">
+        <div class="flex flex-col lg:flex-row justify-center items-start lg:items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <label class="text-sm font-medium text-gray-700">Compare matching types only</label>
+                <div class="flex items-center">
+                    <input type="checkbox" id="matching-types-toggle" class="mr-2 w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                    <span class="text-sm text-gray-600">Images vs Images, Videos vs Videos</span>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <label class="text-sm font-medium text-gray-700">King of the Hill mode</label>
+                <div class="flex items-center">
+                    <input type="checkbox" id="king-of-hill-toggle" class="mr-2 w-4 h-4 text-blue-600 rounded focus:ring-blue-500">
+                    <span class="text-sm text-gray-600">Winner stays, loser gets replaced</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Compare Display -->
+    <div id="compare-display" 
+         hx-indicator="#loading-indicator">
+        <!-- Content will be loaded here -->
+    </div>
+    
+    <!-- Instructions -->
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+        <div class="flex items-center justify-center space-x-2 text-blue-700">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+            </svg>
+            <span class="text-sm font-medium">Click on the file you prefer. The winner gets +1 like, the loser gets -1 like.</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    function vote(winnerId, loserId) {
+        const kingOfHill = document.getElementById('king-of-hill-toggle')?.checked || false;
+        const matchingTypes = document.getElementById('matching-types-toggle')?.checked || false;
+        
+        const body = JSON.stringify({
+            king_of_hill: kingOfHill,
+            matching_types: matchingTypes
+        });
+        
+        fetch(`/api/vote/${winnerId}/${loserId}`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: body
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (kingOfHill) {
+                        showMessage('Vote recorded! Winner stays, loading new challenger...', 'success');
+                    } else {
+                        showMessage('Vote recorded! Loading new comparison...', 'success');
+                    }
+                    
+                    // If king of hill mode and we have replacement data, use it directly
+                    if (kingOfHill && data.html) {
+                        setTimeout(() => {
+                            document.getElementById('compare-display').innerHTML = data.html;
+                            setupCompareClickHandlers();
+                        }, 1000);
+                    } else {
+                        // Reload with new files after a short delay
+                        setTimeout(() => {
+                            refreshComparison();
+                        }, 1000);
+                    }
+                } else {
+                    showMessage('Error recording vote', 'error');
+                }
+            })
+            .catch(error => {
+                showMessage('Error recording vote', 'error');
+            });
+    }
+    
+    function refreshComparison() {
+        const matchingTypes = document.getElementById('matching-types-toggle')?.checked || false;
+        const url = `/api/compare-files-html${matchingTypes ? '?matching_types=true' : ''}`;
+        
+        htmx.ajax('GET', url, {
+            target: '#compare-display',
+            indicator: '#loading-indicator'
+        });
+    }
+    
+    function setupCompareClickHandlers() {
+        const compareOptions = document.querySelectorAll('.compare-option');
+        compareOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                const winnerId = this.getAttribute('data-winner-id');
+                const loserId = this.getAttribute('data-loser-id');
+                vote(winnerId, loserId);
+            });
+        });
+    }
+    
+    function setupMatchingTypesToggle() {
+        const toggle = document.getElementById('matching-types-toggle');
+        if (toggle) {
+            // Load saved preference
+            const savedMatchingTypes = localStorage.getItem('compare-matching-types') === 'true';
+            toggle.checked = savedMatchingTypes;
+            
+            toggle.addEventListener('change', function() {
+                const isEnabled = this.checked;
+                localStorage.setItem('compare-matching-types', isEnabled);
+                refreshComparison();
+            });
+        }
+    }
+    
+    function setupKingOfHillToggle() {
+        const toggle = document.getElementById('king-of-hill-toggle');
+        if (toggle) {
+            // Load saved preference
+            const savedKingOfHill = localStorage.getItem('compare-king-of-hill') === 'true';
+            toggle.checked = savedKingOfHill;
+            
+            toggle.addEventListener('change', function() {
+                const isEnabled = this.checked;
+                localStorage.setItem('compare-king-of-hill', isEnabled);
+                refreshComparison();
+            });
+        }
+    }
+    
+    // Setup handlers on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        setupCompareClickHandlers();
+        setupMatchingTypesToggle();
+        setupKingOfHillToggle();
+        // Initial load with matching types preference
+        refreshComparison();
+    });
+    
+    // Re-setup after HTMX updates
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.target.id === 'compare-display') {
+            setupCompareClickHandlers();
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% if file1 and file2 %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <!-- File 1 -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-shadow duration-300 transform hover:scale-[1.02] compare-option"
+         data-winner-id="{{ file1.id }}" data-loser-id="{{ file2.id }}">>
+        <div class="aspect-square bg-gray-100 flex items-center justify-center">
+            {% if file1.file_type == 'image' %}
+                <img src="/uploads/{{ file1.filename }}" 
+                     alt="{{ file1.original_filename }}" 
+                     class="w-full h-full object-contain">
+            {% elif file1.file_type == 'video' %}
+                <video autoplay muted loop class="w-full h-full object-contain">
+                    <source src="/uploads/{{ file1.filename }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            {% endif %}
+        </div>
+        
+        <div class="p-6 text-center">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2 truncate" title="{{ file1.original_filename }}">
+                {{ file1.original_filename }}
+            </h3>
+            <div class="space-y-2">
+                <div class="flex justify-center items-center space-x-2 text-sm text-gray-600">
+                    <span class="capitalize">{{ file1.file_type }}</span>
+                    <span class="text-gray-400">•</span>
+                    <span>{{ file1.created_at }}</span>
+                </div>
+                <div class="flex justify-center items-center space-x-1">
+                    <svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/>
+                    </svg>
+                    <span class="font-semibold {{ 'text-green-600' if file1.like_count > 0 else 'text-red-600' if file1.like_count < 0 else 'text-gray-600' }}">
+                        {{ file1.like_count }}
+                    </span>
+                </div>
+            </div>
+            <div class="mt-4 text-blue-600 font-medium">Click to choose this one!</div>
+        </div>
+    </div>
+    
+    <!-- VS Divider -->
+    <div class="hidden lg:flex absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-gray-800 text-white rounded-full w-16 h-16 items-center justify-center font-bold text-xl shadow-lg z-10">
+        VS
+    </div>
+    
+    <!-- File 2 -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden cursor-pointer hover:shadow-xl transition-shadow duration-300 transform hover:scale-[1.02] compare-option"
+         data-winner-id="{{ file2.id }}" data-loser-id="{{ file1.id }}">>
+        <div class="aspect-square bg-gray-100 flex items-center justify-center">
+            {% if file2.file_type == 'image' %}
+                <img src="/uploads/{{ file2.filename }}" 
+                     alt="{{ file2.original_filename }}" 
+                     class="w-full h-full object-contain">
+            {% elif file2.file_type == 'video' %}
+                <video autoplay muted loop class="w-full h-full object-contain">
+                    <source src="/uploads/{{ file2.filename }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            {% endif %}
+        </div>
+        
+        <div class="p-6 text-center">
+            <h3 class="text-lg font-semibold text-gray-800 mb-2 truncate" title="{{ file2.original_filename }}">
+                {{ file2.original_filename }}
+            </h3>
+            <div class="space-y-2">
+                <div class="flex justify-center items-center space-x-2 text-sm text-gray-600">
+                    <span class="capitalize">{{ file2.file_type }}</span>
+                    <span class="text-gray-400">•</span>
+                    <span>{{ file2.created_at }}</span>
+                </div>
+                <div class="flex justify-center items-center space-x-1">
+                    <svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/>
+                    </svg>
+                    <span class="font-semibold {{ 'text-green-600' if file2.like_count > 0 else 'text-red-600' if file2.like_count < 0 else 'text-gray-600' }}">
+                        {{ file2.like_count }}
+                    </span>
+                </div>
+            </div>
+            <div class="mt-4 text-blue-600 font-medium">Click to choose this one!</div>
+        </div>
+    </div>
+</div>
+
+<!-- Mobile VS divider -->
+<div class="flex lg:hidden justify-center my-4">
+    <div class="bg-gray-800 text-white rounded-full w-12 h-12 flex items-center justify-center font-bold text-lg shadow-lg">
+        VS
+    </div>
+</div>
+
+{% else %}
+<div class="text-center py-12">
+    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+    <h3 class="mt-2 text-sm font-medium text-gray-900">Not enough files for comparison</h3>
+    <p class="mt-1 text-sm text-gray-500">Upload at least 2 files to start comparing!</p>
+</div>
+{% endif %}

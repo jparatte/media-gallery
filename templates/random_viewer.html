@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Random Viewer{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gray-50 px-6 py-4 border-b">
+            <h2 class="text-xl font-semibold text-gray-800">Random File Viewer</h2>
+            <p class="text-sm text-gray-600 mt-1">Like, dislike, or skip to the next random file</p>
+            <p class="text-xs text-gray-500 mt-1">
+                <span class="font-medium">Keyboard shortcuts:</span> 
+                <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">D</kbd> Dislike, 
+                <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">N</kbd> Next, 
+                <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">L</kbd> Like
+            </p>
+        </div>
+        
+        <!-- File Display Area -->
+        <div id="random-file-container" 
+             hx-get="/api/random-file-html" 
+             hx-trigger="load, newFile"
+             hx-indicator="#loading-indicator"
+             class="relative">
+            <!-- Content will be loaded here -->
+        </div>
+        
+        <!-- Action Buttons -->
+        <div id="action-buttons" class="px-6 py-4 bg-gray-50 border-t flex justify-center space-x-4" style="display: none;">
+            <button id="dislike-btn" 
+                    class="flex items-center space-x-2 bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-colors">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M18 9.5a1.5 1.5 0 11-3 0v-6a1.5 1.5 0 013 0v6zM14 9.667v-5.43a2 2 0 00-1.106-1.79l-.05-.025A4 4 0 0011.057 2H5.64a2 2 0 00-1.962 1.608l-1.2 6A2 2 0 004.44 12H8v4a2 2 0 002 2 1 1 0 001-1v-.667a4 4 0 01.8-2.4l1.4-1.866a4 4 0 00.8-2.4z"/>
+                </svg>
+                <span>Dislike</span>
+            </button>
+            
+            <button id="next-btn" 
+                    class="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg transition-colors">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                </svg>
+                <span>Next</span>
+            </button>
+            
+            <button id="like-btn" 
+                    class="flex items-center space-x-2 bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg transition-colors">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 10.5a1.5 1.5 0 113 0v6a1.5 1.5 0 01-3 0v-6zM6 10.333v5.43a2 2 0 001.106 1.79l.05.025A4 4 0 008.943 18h5.416a2 2 0 001.962-1.608l1.2-6A2 2 0 0015.56 8H12V4a2 2 0 00-2-2 1 1 0 00-1 1v.667a4 4 0 01-.8 2.4L6.8 7.933a4 4 0 00-.8 2.4z"/>
+                </svg>
+                <span>Like</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentFileId = null;
+    let isLoading = false; // Prevent multiple simultaneous requests
+    
+    // Function to load next random file
+    function loadNextFile() {
+        if (isLoading) return;
+        isLoading = true;
+        
+        htmx.ajax('GET', '/api/random-file-html', {
+            target: '#random-file-container',
+            indicator: '#loading-indicator'
+        }).then(() => {
+            isLoading = false;
+        }).catch(() => {
+            isLoading = false;
+            showMessage('Error loading next file', 'error');
+        });
+    }
+    
+    // Handle random file loading
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.target.id === 'random-file-container') {
+            // Get the file ID from the loaded content
+            const fileContainer = document.querySelector('#random-file-container > div[data-file-id]');
+            if (fileContainer) {
+                currentFileId = fileContainer.getAttribute('data-file-id');
+                // Show action buttons
+                document.getElementById('action-buttons').style.display = 'flex';
+            } else {
+                // No file found - hide buttons
+                document.getElementById('action-buttons').style.display = 'none';
+                currentFileId = null;
+            }
+            isLoading = false; // Reset loading state
+        }
+    });
+    
+    // Handle like button
+    document.getElementById('like-btn').addEventListener('click', function() {
+        if (!currentFileId || isLoading) return;
+        
+        fetch(`/api/like/${currentFileId}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                // Update like counter
+                const counter = document.getElementById('like-counter');
+                if (counter) {
+                    counter.textContent = data.like_count;
+                    counter.className = `text-sm font-medium ${
+                        data.like_count > 0 ? 'text-green-600' : 
+                        data.like_count < 0 ? 'text-red-600' : 'text-gray-600'
+                    }`;
+                }
+                
+                // Load next random file after a brief delay
+                setTimeout(() => {
+                    loadNextFile();
+                }, 300);
+            })
+            .catch(error => {
+                showMessage('Error updating like count', 'error');
+                isLoading = false;
+            });
+    });
+    
+    // Handle dislike button
+    document.getElementById('dislike-btn').addEventListener('click', function() {
+        if (!currentFileId || isLoading) return;
+        
+        fetch(`/api/dislike/${currentFileId}`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                // Update like counter
+                const counter = document.getElementById('like-counter');
+                if (counter) {
+                    counter.textContent = data.like_count;
+                    counter.className = `text-sm font-medium ${
+                        data.like_count > 0 ? 'text-green-600' : 
+                        data.like_count < 0 ? 'text-red-600' : 'text-gray-600'
+                    }`;
+                }
+                
+                // Load next random file after a brief delay
+                setTimeout(() => {
+                    loadNextFile();
+                }, 300);
+            })
+            .catch(error => {
+                showMessage('Error updating like count', 'error');
+                isLoading = false;
+            });
+    });
+    
+    // Handle next button (skip without voting)
+    document.getElementById('next-btn').addEventListener('click', function() {
+        if (isLoading) return;
+        loadNextFile();
+    });
+    
+    // Handle HTMX errors
+    document.body.addEventListener('htmx:responseError', function(event) {
+        if (event.target.id === 'random-file-container') {
+            isLoading = false;
+            showMessage('Error loading file', 'error');
+        }
+    });
+    
+    // Handle keyboard shortcuts
+    document.addEventListener('keydown', function(event) {
+        // Only handle shortcuts if we're not in an input field
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+            return;
+        }
+        
+        const key = event.key.toLowerCase();
+        
+        switch(key) {
+            case 'd':
+                event.preventDefault();
+                document.getElementById('dislike-btn').click();
+                break;
+            case 'n':
+                event.preventDefault();
+                document.getElementById('next-btn').click();
+                break;
+            case 'l':
+                event.preventDefault();
+                document.getElementById('like-btn').click();
+                break;
+        }
+    });
+</script>
+{% endblock %}
