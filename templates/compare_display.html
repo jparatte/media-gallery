@@ -20,6 +20,11 @@
             <h3 class="text-lg font-semibold text-gray-800 mb-2 truncate" title="{{ file1.original_filename }}">
                 {{ file1.original_filename }}
             </h3>
+            {% if file1.description %}
+            <p class="text-sm text-gray-600 mb-3 line-clamp-2" title="{{ file1.description }}">
+                {{ file1.description }}
+            </p>
+            {% endif %}
             <div class="space-y-2">
                 <div class="flex justify-center items-center space-x-2 text-sm text-gray-600">
                     <span class="capitalize">{{ file1.file_type }}</span>
@@ -74,6 +79,11 @@
             <h3 class="text-lg font-semibold text-gray-800 mb-2 truncate" title="{{ file2.original_filename }}">
                 {{ file2.original_filename }}
             </h3>
+            {% if file2.description %}
+            <p class="text-sm text-gray-600 mb-3 line-clamp-2" title="{{ file2.description }}">
+                {{ file2.description }}
+            </p>
+            {% endif %}
             <div class="space-y-2">
                 <div class="flex justify-center items-center space-x-2 text-sm text-gray-600">
                     <span class="capitalize">{{ file2.file_type }}</span>

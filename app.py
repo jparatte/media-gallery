@@ -64,6 +64,7 @@ class MediaFile(db.Model):
     file_type = db.Column(db.String(10), nullable=False)
     like_count = db.Column(db.Integer, default=0)
     elo_rating = db.Column(db.Integer, default=1500)  # ELO rating for comparisons
+    description = db.Column(db.Text, nullable=True)  # Optional description for media
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     file_path = db.Column(db.String(500), nullable=False)
     file_size = db.Column(db.Integer, nullable=False, default=0)
@@ -117,6 +118,36 @@ def get_file_type_by_extension(file_path):
         return 'image'
     elif ext in video_exts:
         return 'video'
+    return None
+
+def load_description_from_txt(original_filename, upload_folder):
+    """Check for a .txt file with the same name as the media file and load its content as description.
+    
+    Args:
+        original_filename: Original filename of the media file
+        upload_folder: Path to uploads folder
+    
+    Returns:
+        Description text if .txt file exists, None otherwise
+    """
+    # Get base name without extension
+    base_name = os.path.splitext(original_filename)[0]
+    txt_filename = f"{base_name}.txt"
+    
+    # Check all subfolders for matching .txt file
+    for subfolder in os.listdir(upload_folder):
+        subfolder_path = os.path.join(upload_folder, subfolder)
+        if os.path.isdir(subfolder_path):
+            txt_path = os.path.join(subfolder_path, txt_filename)
+            if os.path.exists(txt_path):
+                try:
+                    with open(txt_path, 'r', encoding='utf-8') as f:
+                        description = f.read().strip()
+                        # Delete the .txt file after reading
+                        os.remove(txt_path)
+                        return description if description else None
+                except Exception as e:
+                    print(f"Error reading description file {txt_path}: {str(e)}")
     return None
 
 def save_uploaded_file(file):
@@ -198,6 +229,7 @@ def index():
     count = int(request.args.get('count', 25))
     sort_type = request.args.get('sort', 'newest')
     tag_filter = request.args.get('tag', '')  # Add tag filter
+    search_query = request.args.get('search', '')  # Add search filter
     page = int(request.args.get('page', 1))
     
     # Build base query
@@ -210,6 +242,10 @@ def index():
     # Apply tag filter if specified
     if tag_filter:
         query = query.join(MediaFile.tags).filter(Tag.name == tag_filter.lower())
+    
+    # Apply description search filter (only search non-null descriptions)
+    if search_query:
+        query = query.filter(MediaFile.description.isnot(None), MediaFile.description.ilike(f'%{search_query}%'))
     
     # Apply sorting
     if sort_type == 'top':
@@ -248,6 +284,7 @@ def index():
                          current_count=count,
                          current_sort=sort_type,
                          current_tag=tag_filter,
+                         current_search=search_query,
                          current_page=page,
                          total_pages=total_pages,
                          total_files=total_files)
@@ -313,7 +350,10 @@ def upload_files():
                 # Create tags from filename
                 tags = create_tags_from_filename(file_info['original_filename'])
                 
-                # Create MediaFile with auto-generated tags
+                # Check for matching .txt file for description
+                description = load_description_from_txt(file_info['original_filename'], app.config['UPLOAD_FOLDER'])
+                
+                # Create MediaFile with auto-generated tags and description
                 media_file = MediaFile(
                     filename=file_info['filename'],
                     original_filename=file_info['original_filename'], 
@@ -321,6 +361,7 @@ def upload_files():
                     file_path=file_info['file_path'],
                     file_size=file_info['file_size'],
                     file_hash=file_info['file_hash'],
+                    description=description,
                     tags=tags
                 )
                 
@@ -357,6 +398,7 @@ def refresh_gallery():
     count = int(request.args.get('count', 25))
     sort_type = request.args.get('sort', 'newest')
     tag_filter = request.args.get('tag', '')  # Add tag filter
+    search_query = request.args.get('search', '')  # Add search filter
     page = int(request.args.get('page', 1))
     
     # Build query with same logic as index route
@@ -367,6 +409,9 @@ def refresh_gallery():
     
     if tag_filter:
         query = query.join(MediaFile.tags).filter(Tag.name == tag_filter.lower())
+    
+    if search_query:
+        query = query.filter(MediaFile.description.isnot(None), MediaFile.description.ilike(f'%{search_query}%'))
     
     if sort_type == 'top':
         query = query.order_by(MediaFile.like_count.desc())
@@ -774,6 +819,28 @@ def remove_tag_from_file(file_id, tag_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Failed to remove tag: {str(e)}'}), 500
 
+@app.route('/api/file/<int:file_id>/description', methods=['POST'])
+def update_file_description(file_id):
+    """Update description for a file"""
+    try:
+        file = MediaFile.query.get_or_404(file_id)
+        data = request.get_json()
+        description = data.get('description', '').strip()
+        
+        # Allow empty description (set to None)
+        file.description = description if description else None
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'description': file.description,
+            'message': 'Description updated successfully'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to update description: {str(e)}'}), 500
+
 @app.route('/api/tags/search')
 def search_tags():
     """Search tags for autocomplete"""
@@ -907,7 +974,7 @@ def export_likes():
     output = io.StringIO()
     writer = csv.writer(output)
     # Header
-    writer.writerow(['id', 'original_filename', 'filename', 'file_type', 'like_count', 'elo_rating', 'created_at'])
+    writer.writerow(['id', 'original_filename', 'filename', 'file_type', 'like_count', 'elo_rating', 'description', 'created_at'])
     for m in MediaFile.query.order_by(MediaFile.id).all():
         writer.writerow([
             m.id,
@@ -916,6 +983,7 @@ def export_likes():
             m.file_type,
             m.like_count,
             m.elo_rating,
+            m.description or '',
             m.created_at.isoformat()
         ])
     output.seek(0)

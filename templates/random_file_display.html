@@ -13,6 +13,11 @@
     </div>
     <div class="text-center">
         <h3 class="text-lg font-medium text-gray-800 mb-2">{{ file.original_filename }}</h3>
+        {% if file.description %}
+        <p class="text-sm text-gray-600 mb-3 max-w-2xl mx-auto" title="{{ file.description }}">
+            {{ file.description }}
+        </p>
+        {% endif %}
         <div class="flex justify-center items-center space-x-2">
             <span class="text-sm text-gray-500 capitalize">{{ file.file_type }}</span>
             <span class="text-gray-400">•</span>

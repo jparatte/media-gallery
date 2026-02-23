@@ -21,6 +21,12 @@
                     {{ file.original_filename }}
                 </h3>
                 
+                {% if file.description %}
+                <p class="text-xs text-gray-600 mb-2 line-clamp-2" title="{{ file.description }}">
+                    {{ file.description }}
+                </p>
+                {% endif %}
+                
                 <!-- Tags display (moved up for better visibility) -->
                 {% if file.tags %}
                 <div class="mb-3">

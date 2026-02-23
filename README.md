@@ -9,6 +9,7 @@ A Flask-based web application for managing and viewing collections of images and
 - **Random Viewer**: Single file viewer with like/dislike functionality
 - **Compare Mode**: Side-by-side comparison with ELO-based rating system
 - **Dual Rating System**: ELO ratings from comparisons + direct like/dislike counts
+- **Description Support**: Add descriptions via .txt files or manual editing
 - **Adventure Mode**: Sequential media slideshow with customizable parameters
 - **Video Editing**: Basic trimming functionality for video files
 - **File Management**: Delete files directly from fullscreen view
@@ -44,6 +45,9 @@ python app.py
 - Visit the main gallery page
 - Drag and drop images/videos onto the upload area, or click to select files
 - Supported formats: Images (JPG, PNG, GIF, WebP, BMP) and Videos (MP4, AVI, MOV, WebM, MKV)
+- **Auto-description**: Upload a `.txt` file with the same name as your media file to automatically populate its description
+  - Example: Upload `photo.jpg` and `photo.txt` together
+  - The .txt file content becomes the description and the file is removed after processing
 
 ### Gallery View
 - Browse 10 randomly selected files in a masonry layout
@@ -107,6 +111,7 @@ gallery/
 - `file_type`: 'image' or 'video'
 - `like_count`: Integer counter for direct likes/dislikes (can be negative)
 - `elo_rating`: ELO rating from comparisons (default 1500)
+- `description`: Optional text description
 - `created_at`: Upload timestamp
 - `file_path`: Full path to stored file
 - `file_size`: Size in bytes
@@ -126,6 +131,7 @@ The application is designed to be easily extensible:
 - `POST /api/like/<id>`: Increase like count (independent from ELO)
 - `POST /api/dislike/<id>`: Decrease like count (independent from ELO)
 - `POST /api/vote/<winner_id>/<loser_id>`: Update ELO ratings based on comparison
+- `POST /api/file/<id>/description`: Update description for a media file
 - `GET /api/refresh-gallery`: Get new random gallery grid
 - `POST /upload`: Handle file uploads
 - `GET /?page=N` / `GET /api/refresh-gallery?page=N`: Paginated gallery data (combine with type, count, sort, tag)
@@ -269,7 +275,7 @@ You can export the current like counts and ELO ratings for all media files and o
 
 Downloads a file `media_likes.csv` containing columns:
 
-`id, original_filename, filename, file_type, like_count, elo_rating, created_at`
+`id, original_filename, filename, file_type, like_count, elo_rating, description, created_at`
 
 Example:
 
@@ -296,6 +302,52 @@ curl -X POST http://localhost:5002/api/reset-elo
 ```
 
 Response: `{"success": true, "affected": <number>, "message": "Reset ELO ratings for <number> media files."}`
+
+## Description Support
+
+Add context and notes to your media files with descriptions.
+
+### Auto-load from .txt Files
+
+When uploading media, include a `.txt` file with the same base name:
+
+```
+Upload together:
+  - sunset_beach.jpg
+  - sunset_beach.txt (contains: "Beautiful sunset at Malibu Beach, August 2024")
+
+Result:
+  - Media file saved with auto-populated description
+  - .txt file automatically deleted after processing
+```
+
+**Important**: The .txt file must be uploaded in the same batch as the media file.
+
+### Manual Editing
+
+Edit descriptions anytime:
+
+1. Open any media file in Edit view
+2. Find the "Description" section
+3. Enter or update the description text
+4. Click "Save Description"
+
+### Display
+
+Descriptions appear:
+- In gallery grid (truncated to 2 lines)
+- In compare view
+- In random viewer
+- In CSV exports
+- When hovering (full text tooltip)
+
+### Migration
+
+For existing databases:
+
+```bash
+python migrate_add_description.py
+```
 
 
 - Trim video files by specifying start and end points

@@ -40,6 +40,7 @@
                 {% if current_sort == 'top' %}Most Liked{% elif current_sort == 'elo' %}Top ELO{% elif current_sort == 'newest' %}Newest{% elif current_sort == 'oldest' %}Oldest{% else %}Random{% endif %} 
                 {% if current_type != 'both' %}{{ current_type.title() }}{% endif %}
                 {% if current_tag %}with "{{ current_tag.title() }}" tag{% endif %}
+                {% if current_search %}matching "{{ current_search }}"{% endif %}
                 Files)
             </h2>
 
@@ -100,6 +101,12 @@
                         </option>
                         {% endfor %}
                     </select>
+                </div>
+                
+                <!-- Search Filter -->
+                <div class="flex flex-col">
+                    <label class="text-sm font-medium text-gray-700 mb-1">Search Description</label>
+                    <input type="text" id="search-filter" placeholder="Search..." value="{{ current_search if current_search else '' }}" class="border border-gray-300 rounded-md px-3 py-2 text-sm w-48">
                 </div>
                 
                 <!-- Autoplay Toggle -->
@@ -225,6 +232,7 @@
     function setupFilterControls() {
         const refreshBtn = document.getElementById('refresh-btn');
         const autoApplyFilters = document.querySelectorAll('.auto-apply-filter');
+        const searchFilter = document.getElementById('search-filter');
         
         // Add event listeners to all auto-apply filter elements
         autoApplyFilters.forEach(filter => {
@@ -232,6 +240,15 @@
                 applyFilters();
             });
         });
+        
+        // Add search field listener for Enter key
+        if (searchFilter) {
+            searchFilter.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    applyFilters();
+                }
+            });
+        }
         
         if (refreshBtn) {
             refreshBtn.addEventListener('click', refreshGallery);
@@ -465,6 +482,7 @@
         const countFilter = document.getElementById('count-filter').value;
         const sortFilter = document.getElementById('sort-filter').value;
         const tagFilter = document.getElementById('tag-filter').value;
+        const searchFilter = document.getElementById('search-filter').value;
         // Reset to first page when filters change
         const page = 1;
         
@@ -481,6 +499,12 @@
             url.searchParams.delete('tag');
         }
         
+        if (searchFilter) {
+            url.searchParams.set('search', searchFilter);
+        } else {
+            url.searchParams.delete('search');
+        }
+        
         // Reload page with new filters
         window.location.href = url.toString();
     }
@@ -490,6 +514,7 @@
         const countFilter = document.getElementById('count-filter').value;
         const sortFilter = document.getElementById('sort-filter').value;
         const tagFilter = document.getElementById('tag-filter').value;
+        const searchFilter = document.getElementById('search-filter').value;
         
         // Build refresh URL with current filters
         const params = new URLSearchParams({
@@ -500,6 +525,10 @@
         
         if (tagFilter) {
             params.append('tag', tagFilter);
+        }
+        
+        if (searchFilter) {
+            params.append('search', searchFilter);
         }
         
         const refreshUrl = `/api/refresh-gallery?${params.toString()}`;
@@ -590,6 +619,13 @@
                 }
             }
         });
+        // Also preserve search filter
+        const searchVal = document.getElementById('search-filter')?.value;
+        if (searchVal) {
+            url.searchParams.set('search', searchVal);
+        } else {
+            url.searchParams.delete('search');
+        }
         window.location.href = url.toString();
     }
 

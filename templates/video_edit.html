@@ -140,6 +140,29 @@
         <div id="tag-message" class="hidden p-3 rounded-md mb-4"></div>
     </div>
     
+    <!-- Description Management -->
+    <div class="bg-white rounded-lg shadow-lg p-6">
+        <h3 class="text-xl font-semibold text-gray-800 mb-4">Description</h3>
+        
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Video Description:</label>
+            <textarea id="description-input" rows="4" 
+                      class="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Add a description for this video...">
+{{- file.description if file.description else '' -}}</textarea>
+            <p class="text-xs text-gray-500 mt-1">Tip: You can also upload a .txt file with the same name as your video during upload to auto-populate this field.</p>
+        </div>
+        
+        <div class="flex justify-end">
+            <button id="save-description-btn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md text-sm transition-colors">
+                Save Description
+            </button>
+        </div>
+        
+        <!-- Success/Error Messages -->
+        <div id="description-message" class="hidden p-3 rounded-md mt-4"></div>
+    </div>
+    
     <!-- Processing indicator -->
     <div id="processing-indicator" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
         <div class="bg-white rounded-lg p-6 text-center">
@@ -476,6 +499,49 @@
             
             setTimeout(() => {
                 tagMessage.classList.add('hidden');
+            }, 3000);
+        }
+    }
+    
+    // Description management
+    const descriptionInput = document.getElementById('description-input');
+    const saveDescriptionBtn = document.getElementById('save-description-btn');
+    const descriptionMessage = document.getElementById('description-message');
+    
+    if (saveDescriptionBtn) {
+        saveDescriptionBtn.addEventListener('click', function() {
+            const description = descriptionInput.value.trim();
+            
+            fetch(`/api/file/${fileId}/description`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ description })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showDescriptionMessage(data.message, 'success');
+                } else {
+                    showDescriptionMessage(data.error || 'Failed to update description', 'error');
+                }
+            })
+            .catch(error => {
+                showDescriptionMessage('Error updating description', 'error');
+                console.error('Error:', error);
+            });
+        });
+    }
+    
+    function showDescriptionMessage(message, type) {
+        if (descriptionMessage) {
+            descriptionMessage.textContent = message;
+            descriptionMessage.className = `p-3 rounded-md mt-4 ${type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            descriptionMessage.classList.remove('hidden');
+            
+            setTimeout(() => {
+                descriptionMessage.classList.add('hidden');
             }, 3000);
         }
     }
