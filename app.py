@@ -63,6 +63,7 @@ class MediaFile(db.Model):
     original_filename = db.Column(db.String(255), nullable=False)
     file_type = db.Column(db.String(10), nullable=False)
     like_count = db.Column(db.Integer, default=0)
+    elo_rating = db.Column(db.Integer, default=1500)  # ELO rating for comparisons
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     file_path = db.Column(db.String(500), nullable=False)
     file_size = db.Column(db.Integer, nullable=False, default=0)
@@ -213,6 +214,8 @@ def index():
     # Apply sorting
     if sort_type == 'top':
         query = query.order_by(MediaFile.like_count.desc())
+    elif sort_type == 'elo':
+        query = query.order_by(MediaFile.elo_rating.desc())
     elif sort_type == 'newest':
         query = query.order_by(MediaFile.created_at.desc())
     elif sort_type == 'oldest':
@@ -367,6 +370,8 @@ def refresh_gallery():
     
     if sort_type == 'top':
         query = query.order_by(MediaFile.like_count.desc())
+    elif sort_type == 'elo':
+        query = query.order_by(MediaFile.elo_rating.desc())
     elif sort_type == 'newest':
         query = query.order_by(MediaFile.created_at.desc())
     elif sort_type == 'oldest':
@@ -468,12 +473,15 @@ def get_compare_files_html():
 
 @app.route('/api/vote/<int:winner_id>/<int:loser_id>', methods=['POST'])
 def vote_compare(winner_id, loser_id):
-    """Handle voting in compare view - increase winner, decrease loser"""
+    """Handle voting in compare view - update ELO ratings based on comparison"""
     winner = MediaFile.query.get_or_404(winner_id)
     loser = MediaFile.query.get_or_404(loser_id)
     
-    winner.like_count += 1
-    loser.like_count -= 1
+    # Calculate new ELO ratings
+    winner_new_elo, loser_new_elo = calculate_elo_change(winner.elo_rating, loser.elo_rating)
+    
+    winner.elo_rating = winner_new_elo
+    loser.elo_rating = loser_new_elo
     
     db.session.commit()
     
@@ -484,6 +492,8 @@ def vote_compare(winner_id, loser_id):
     
     response_data = {
         'success': True,
+        'winner_elo': winner.elo_rating,
+        'loser_elo': loser.elo_rating,
         'winner_likes': winner.like_count,
         'loser_likes': loser.like_count
     }
@@ -869,6 +879,27 @@ def calculate_file_hash(file_path):
         print(f"Error calculating hash for {file_path}: {str(e)}")
         return None
 
+def calculate_elo_change(winner_rating, loser_rating, k_factor=32):
+    """Calculate ELO rating changes for winner and loser.
+    
+    Args:
+        winner_rating: Current ELO rating of the winner
+        loser_rating: Current ELO rating of the loser
+        k_factor: Maximum change in rating (default 32, standard for most systems)
+    
+    Returns:
+        Tuple of (winner_new_rating, loser_new_rating)
+    """
+    # Expected scores
+    expected_winner = 1 / (1 + 10 ** ((loser_rating - winner_rating) / 400))
+    expected_loser = 1 / (1 + 10 ** ((winner_rating - loser_rating) / 400))
+    
+    # Actual scores (winner gets 1, loser gets 0)
+    winner_new = winner_rating + k_factor * (1 - expected_winner)
+    loser_new = loser_rating + k_factor * (0 - expected_loser)
+    
+    return round(winner_new), round(loser_new)
+
 # --- Utility / Admin Endpoints ---
 @app.route('/api/export-likes', methods=['GET'])
 def export_likes():
@@ -876,7 +907,7 @@ def export_likes():
     output = io.StringIO()
     writer = csv.writer(output)
     # Header
-    writer.writerow(['id', 'original_filename', 'filename', 'file_type', 'like_count', 'created_at'])
+    writer.writerow(['id', 'original_filename', 'filename', 'file_type', 'like_count', 'elo_rating', 'created_at'])
     for m in MediaFile.query.order_by(MediaFile.id).all():
         writer.writerow([
             m.id,
@@ -884,6 +915,7 @@ def export_likes():
             m.filename,
             m.file_type,
             m.like_count,
+            m.elo_rating,
             m.created_at.isoformat()
         ])
     output.seek(0)
@@ -905,6 +937,17 @@ def reset_likes():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Failed to reset likes: {str(e)}'}), 500
+
+@app.route('/api/reset-elo', methods=['POST'])
+def reset_elo():
+    """Reset ELO ratings to 1500 for all media files."""
+    try:
+        affected = MediaFile.query.update({MediaFile.elo_rating: 1500})
+        db.session.commit()
+        return jsonify({'success': True, 'affected': affected, 'message': f'Reset ELO ratings for {affected} media files.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to reset ELO: {str(e)}'}), 500
 
 # Run the app
 if __name__ == '__main__':

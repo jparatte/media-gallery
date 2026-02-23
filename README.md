@@ -7,11 +7,12 @@ A Flask-based web application for managing and viewing collections of images and
 - **Drag & Drop Upload**: Upload multiple images and videos simultaneously (up to 2GB per file)
 - **Masonry Gallery**: Beautiful responsive layout displaying 10 random files
 - **Random Viewer**: Single file viewer with like/dislike functionality
-- **Compare Mode**: Side-by-side comparison with voting and King of the Hill mode
+- **Compare Mode**: Side-by-side comparison with ELO-based rating system
+- **Dual Rating System**: ELO ratings from comparisons + direct like/dislike counts
 - **Adventure Mode**: Sequential media slideshow with customizable parameters
 - **Video Editing**: Basic trimming functionality for video files
 - **File Management**: Delete files directly from fullscreen view
-- **Like System**: Track preferences with positive/negative counters
+- **Tag System**: Automatic tag generation and manual tag management
 - **Organized Storage**: Files automatically organized into subfolders for better performance
 - **Responsive Design**: Works seamlessly on desktop and mobile devices
 - **Real-time Updates**: Smooth interactions powered by HTMX
@@ -58,9 +59,11 @@ python app.py
 
 ### Compare Mode
 - Side-by-side comparison of two random files
-- Vote for your preferred file (winner gets +1, loser gets -1)
+- Vote for your preferred file using ELO rating algorithm
+- ELO ratings adjust based on expected vs actual outcomes (standard K-factor of 32)
 - Optional "matching types" mode (images vs images, videos vs videos)
 - "King of the Hill" mode where winner stays and only loser is replaced
+- Like/dislike counts remain independent from comparison votes
 
 ### Adventure Mode
 - Sequential slideshow experience with customizable parameters:
@@ -102,9 +105,12 @@ gallery/
 - `filename`: Unique filename for storage
 - `original_filename`: Original uploaded filename
 - `file_type`: 'image' or 'video'
-- `like_count`: Integer counter (can be negative)
+- `like_count`: Integer counter for direct likes/dislikes (can be negative)
+- `elo_rating`: ELO rating from comparisons (default 1500)
 - `created_at`: Upload timestamp
 - `file_path`: Full path to stored file
+- `file_size`: Size in bytes
+- `file_hash`: SHA-256 hash for duplicate detection
 
 ## Development
 
@@ -117,13 +123,15 @@ The application is designed to be easily extensible:
 
 ### API Endpoints
 - `GET /api/random-file`: Get random file data
-- `POST /api/like/<id>`: Increase like count
-- `POST /api/dislike/<id>`: Decrease like count
+- `POST /api/like/<id>`: Increase like count (independent from ELO)
+- `POST /api/dislike/<id>`: Decrease like count (independent from ELO)
+- `POST /api/vote/<winner_id>/<loser_id>`: Update ELO ratings based on comparison
 - `GET /api/refresh-gallery`: Get new random gallery grid
 - `POST /upload`: Handle file uploads
 - `GET /?page=N` / `GET /api/refresh-gallery?page=N`: Paginated gallery data (combine with type, count, sort, tag)
-- `GET /api/export-likes`: Download a CSV file with current like counts for all media
+- `GET /api/export-likes`: Download a CSV file with current like counts and ELO ratings
 - `POST /api/reset-likes`: Reset all like counts to zero
+- `POST /api/reset-elo`: Reset all ELO ratings to 1500
 
 ## Configuration
 
@@ -204,26 +212,64 @@ The gallery supports page-based navigation. Parameters:
 - `page`: 1-based page number (default: 1)
 - `count`: items per page (10, 25, 50)
 - `type`: `both`, `image`, or `video`
-- `sort`: `newest`, `oldest`, `top`, or `random`
+- `sort`: `newest`, `oldest`, `elo`, `top`, or `random`
 - `tag`: optional tag name filter
+
+Sort options:
+- `elo`: Sort by ELO rating (highest first) - reflects comparison performance
+- `top`: Sort by like count (most liked first) - reflects direct user feedback
+- `newest` / `oldest`: Sort by upload date
+- `random`: Random order
 
 Example:
 
 ```
-/ ?type=image&sort=top&count=25&page=2
+/?type=image&sort=elo&count=25&page=2
 ```
 
 Fullscreen view supports keyboard navigation (ArrowLeft / ArrowRight) cycling within the currently loaded page.
 
+## Rating System
+
+The gallery uses a **dual rating system** that tracks quality in two independent ways:
+
+### ELO Rating (Comparisons)
+- **Purpose**: Measures relative quality through head-to-head comparisons
+- **Default**: All files start at 1500 ELO
+- **Algorithm**: Standard ELO system with K-factor of 32
+  - When you choose a winner in Compare mode, both files' ratings adjust
+  - Beating a higher-rated opponent gains more points
+  - Losing to a lower-rated opponent loses more points
+  - Expected score formula: `1 / (1 + 10^((opponent_rating - your_rating) / 400))`
+- **Updates**: Only changes through `/api/vote` endpoint (Compare mode)
+- **Use case**: "Which media is objectively better?"
+
+### Like Count (Direct Feedback)
+- **Purpose**: Tracks individual user sentiment
+- **Default**: All files start at 0
+- **Range**: Can be positive (net likes) or negative (net dislikes)
+- **Updates**: Changes through thumbs up/down in Random Viewer or Gallery
+  - `/api/like/<id>`: +1 to like_count
+  - `/api/dislike/<id>`: -1 to like_count
+- **Independent**: Not affected by comparison votes
+- **Use case**: "Do I personally like this media?"
+
+### Why Both?
+
+- **ELO** gives you a ranking based on comparative quality across your entire collection
+- **Like Count** lets you quickly favorite items or mark ones you dislike
+- Sort by ELO to see your "best" media; sort by "Most Liked" to see your favorites
+- Both metrics are displayed together on every media item (star icon for ELO, thumbs up for likes)
+
 ## Like Count Export & Reset
 
-You can export the current like counts for all media files and optionally reset them.
+You can export the current like counts and ELO ratings for all media files and optionally reset them.
 
 ### Export CSV
 
 Downloads a file `media_likes.csv` containing columns:
 
-`id, original_filename, filename, file_type, like_count, created_at`
+`id, original_filename, filename, file_type, like_count, elo_rating, created_at`
 
 Example:
 
@@ -240,6 +286,16 @@ curl -X POST http://localhost:5002/api/reset-likes
 ```
 
 Response: `{"success": true, "affected": <number>, "message": "Reset like counts for <number> media files."}`
+
+### Reset All ELO Ratings
+
+Sets every `MediaFile.elo_rating` to `1500` (the default starting rating).
+
+```bash
+curl -X POST http://localhost:5002/api/reset-elo
+```
+
+Response: `{"success": true, "affected": <number>, "message": "Reset ELO ratings for <number> media files."}`
 
 
 - Trim video files by specifying start and end points

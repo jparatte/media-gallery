@@ -37,7 +37,7 @@
         <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
             <h2 class="text-xl font-semibold">
                 Gallery ({{ files|length }} 
-                {% if current_sort == 'top' %}Top{% elif current_sort == 'newest' %}Newest{% elif current_sort == 'oldest' %}Oldest{% else %}Random{% endif %} 
+                {% if current_sort == 'top' %}Most Liked{% elif current_sort == 'elo' %}Top ELO{% elif current_sort == 'newest' %}Newest{% elif current_sort == 'oldest' %}Oldest{% else %}Random{% endif %} 
                 {% if current_type != 'both' %}{{ current_type.title() }}{% endif %}
                 {% if current_tag %}with "{{ current_tag.title() }}" tag{% endif %}
                 Files)
@@ -82,7 +82,8 @@
                     <label class="text-sm font-medium text-gray-700 mb-1">Sort</label>
                     <select id="sort-filter" class="border border-gray-300 rounded-md px-3 py-2 text-sm auto-apply-filter">
                         <option value="random" {{ 'selected' if current_sort == 'random' else '' }}>Random</option>
-                        <option value="top" {{ 'selected' if current_sort == 'top' else '' }}>Top Liked</option>
+                        <option value="elo" {{ 'selected' if current_sort == 'elo' else '' }}>Top ELO</option>
+                        <option value="top" {{ 'selected' if current_sort == 'top' else '' }}>Most Liked</option>
                         <option value="newest" {{ 'selected' if current_sort == 'newest' else '' }}>Newest</option>
                         <option value="oldest" {{ 'selected' if current_sort == 'oldest' else '' }}>Oldest</option>
                     </select>
