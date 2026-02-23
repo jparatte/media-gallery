@@ -1,7 +1,7 @@
 {% if files %}
 <div class="masonry">
     {% for file in files %}
-    <div class="masonry-item" data-file-id="{{ file.id }}">
+    <div class="masonry-item" data-file-id="{{ file.id }}" data-index="{{ loop.index0 }}">
         <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200 gallery-item"
              data-file-id="{{ file.id }}">
             {% if file.file_type == 'image' %}
@@ -54,6 +54,38 @@
     </div>
     {% endfor %}
 </div>
+
+{% if total_pages and total_pages > 1 %}
+<div class="flex justify-between items-center mt-6" id="pagination-controls"
+     data-current-page="{{ current_page }}" data-total-pages="{{ total_pages }}">
+    <div>
+        <button 
+            id="prev-page-btn"
+            class="px-4 py-2 bg-gray-200 rounded disabled:opacity-50" 
+            data-target-page="{{ current_page - 1 }}" 
+            {% if current_page == 1 %}disabled{% endif %}>
+            Prev
+        </button>
+    </div>
+    <div class="flex items-center space-x-2">
+        <span class="text-sm text-gray-600">Page {{ current_page }} of {{ total_pages }}</span>
+        <select id="page-select" class="border border-gray-300 rounded-md px-2 py-1 text-sm">
+            {% for p in range(1, total_pages + 1) %}
+            <option value="{{ p }}" {{ 'selected' if p == current_page else '' }}>Page {{ p }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div>
+        <button 
+            id="next-page-btn"
+            class="px-4 py-2 bg-gray-200 rounded disabled:opacity-50" 
+            data-target-page="{{ current_page + 1 }}" 
+            {% if current_page == total_pages %}disabled{% endif %}>
+            Next
+        </button>
+    </div>
+</div>
+{% endif %}
 {% else %}
 <div class="text-center py-12">
     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">

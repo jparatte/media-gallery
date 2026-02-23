@@ -2,6 +2,9 @@ import os
 import uuid
 import shutil
 import hashlib
+import json
+import csv
+import io
 from datetime import datetime
 from flask import Flask, request, render_template, jsonify, redirect, url_for, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -23,6 +26,35 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Initialize database
 db = SQLAlchemy(app)
+
+# Feature configuration loading
+def load_config():
+    """Load gallery configuration JSON. Path can be overridden with GALLERY_CONFIG env var."""
+    default_path = os.environ.get('GALLERY_CONFIG', os.path.join(os.path.dirname(__file__), 'config.json'))
+    try:
+        with open(default_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"Config file not found at {default_path}, using defaults.")
+        return { 'features': {} }
+    except json.JSONDecodeError as e:
+        print(f"Malformed config file {default_path}: {e}. Using empty config.")
+        return { 'features': {} }
+
+CONFIG = load_config()
+
+def feature_enabled(name: str, default: bool = True) -> bool:
+    """Check if a feature is enabled, defaulting to True if not specified."""
+    features = CONFIG.get('features', {})
+    value = features.get(name)
+    if value is None:
+        return default
+    return bool(value)
+
+@app.context_processor
+def inject_feature_helper():
+    """Inject feature_enabled helper into templates."""
+    return {'feature_enabled': feature_enabled}
 
 # Models
 class MediaFile(db.Model):
@@ -165,6 +197,7 @@ def index():
     count = int(request.args.get('count', 25))
     sort_type = request.args.get('sort', 'newest')
     tag_filter = request.args.get('tag', '')  # Add tag filter
+    page = int(request.args.get('page', 1))
     
     # Build base query
     query = MediaFile.query
@@ -187,8 +220,20 @@ def index():
     else:  # random
         query = query.order_by(db.func.random())
     
-    # Get files and limit to count
-    files = query.limit(count).all()
+    # Get total file count before pagination
+    total_files = query.count()
+    if count < 1:
+        count = 25
+    # Calculate total pages (at least 1)
+    total_pages = max(1, (total_files + count - 1) // count)
+    # Clamp page inside range
+    if page < 1:
+        page = 1
+    if page > total_pages:
+        page = total_pages
+
+    # Apply pagination
+    files = query.offset((page - 1) * count).limit(count).all()
     
     # Get all available tags for the filter dropdown
     available_tags = Tag.query.order_by(Tag.name).all()
@@ -199,7 +244,10 @@ def index():
                          current_type=file_type,
                          current_count=count,
                          current_sort=sort_type,
-                         current_tag=tag_filter)
+                         current_tag=tag_filter,
+                         current_page=page,
+                         total_pages=total_pages,
+                         total_files=total_files)
 
 @app.route('/random')
 def random_viewer():
@@ -306,6 +354,7 @@ def refresh_gallery():
     count = int(request.args.get('count', 25))
     sort_type = request.args.get('sort', 'newest')
     tag_filter = request.args.get('tag', '')  # Add tag filter
+    page = int(request.args.get('page', 1))
     
     # Build query with same logic as index route
     query = MediaFile.query
@@ -325,9 +374,23 @@ def refresh_gallery():
     else:
         query = query.order_by(db.func.random())
     
-    files = query.limit(count).all()
-    
-    return render_template('gallery_grid.html', files=files)
+    # Total files for pagination
+    total_files = query.count()
+    if count < 1:
+        count = 25
+    total_pages = max(1, (total_files + count - 1) // count)
+    if page < 1:
+        page = 1
+    if page > total_pages:
+        page = total_pages
+
+    files = query.offset((page - 1) * count).limit(count).all()
+
+    return render_template('gallery_grid.html', 
+                           files=files,
+                           current_page=page,
+                           total_pages=total_pages,
+                           total_files=total_files)
 
 @app.route('/compare')
 def compare_view():
@@ -547,6 +610,8 @@ def trim_video(file_id):
 @app.route('/adventure')
 def adventure_view():
     """Adventure view for sequential media display"""
+    if not feature_enabled('adventure'):
+        return jsonify({'error': 'Feature disabled'}), 404
     # Get like count range for risk level selection
     min_likes = db.session.query(db.func.min(MediaFile.like_count)).scalar() or 0
     max_likes = db.session.query(db.func.max(MediaFile.like_count)).scalar() or 0
@@ -556,6 +621,8 @@ def adventure_view():
 @app.route('/api/adventure-start', methods=['POST'])
 def start_adventure():
     """Start an adventure with given parameters"""
+    if not feature_enabled('adventure'):
+        return jsonify({'error': 'Feature disabled'}), 404
     data = request.get_json()
     risk_level = int(data.get('risk_level', 0))
     steps = int(data.get('steps', 8))
@@ -801,6 +868,43 @@ def calculate_file_hash(file_path):
     except Exception as e:
         print(f"Error calculating hash for {file_path}: {str(e)}")
         return None
+
+# --- Utility / Admin Endpoints ---
+@app.route('/api/export-likes', methods=['GET'])
+def export_likes():
+    """Export current like counts for all media as CSV."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    # Header
+    writer.writerow(['id', 'original_filename', 'filename', 'file_type', 'like_count', 'created_at'])
+    for m in MediaFile.query.order_by(MediaFile.id).all():
+        writer.writerow([
+            m.id,
+            m.original_filename,
+            m.filename,
+            m.file_type,
+            m.like_count,
+            m.created_at.isoformat()
+        ])
+    output.seek(0)
+    return app.response_class(
+        output.read(),
+        mimetype='text/csv',
+        headers={
+            'Content-Disposition': 'attachment; filename=media_likes.csv'
+        }
+    )
+
+@app.route('/api/reset-likes', methods=['POST'])
+def reset_likes():
+    """Reset like_count to zero for all media files."""
+    try:
+        affected = MediaFile.query.update({MediaFile.like_count: 0})
+        db.session.commit()
+        return jsonify({'success': True, 'affected': affected, 'message': f'Reset like counts for {affected} media files.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to reset likes: {str(e)}'}), 500
 
 # Run the app
 if __name__ == '__main__':

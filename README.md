@@ -48,6 +48,8 @@ python app.py
 - Browse 10 randomly selected files in a masonry layout
 - Click "Refresh Gallery" to load 10 new random files
 - View file names, types, and current like counts
+- Paginate through results using Prev/Next or page selector when more than one page is available
+- Keyboard navigation in fullscreen: Left/Right arrows cycle through currently loaded page items
 
 ### Random Viewer
 - Navigate to the Random Viewer page
@@ -119,6 +121,9 @@ The application is designed to be easily extensible:
 - `POST /api/dislike/<id>`: Decrease like count
 - `GET /api/refresh-gallery`: Get new random gallery grid
 - `POST /upload`: Handle file uploads
+- `GET /?page=N` / `GET /api/refresh-gallery?page=N`: Paginated gallery data (combine with type, count, sort, tag)
+- `GET /api/export-likes`: Download a CSV file with current like counts for all media
+- `POST /api/reset-likes`: Reset all like counts to zero
 
 ## Configuration
 
@@ -127,6 +132,50 @@ The application uses the following default settings:
 - Upload folder: `./uploads`
 - Max file size: 100MB
 - Debug mode: Enabled (development only)
+
+### Feature Toggles
+
+You can enable or disable entire views/features via a JSON configuration file `config.json` placed in the project root (already created by default). Override the path using the `GALLERY_CONFIG` environment variable if needed.
+
+Example `config.json`:
+
+```json
+{
+  "features": {
+    "adventure": false,
+    "compare": true,
+    "random": true,
+    "upload": true,
+    "video_edit": true,
+    "tag_edit": true
+  }
+}
+```
+
+Available feature keys:
+
+- `adventure` – Adventure slideshow view and its API
+- `compare` – Compare view and vote endpoints
+- `random` – Random viewer page
+- `upload` – Upload UI and `/api/upload` endpoint (currently only hides nav/UI; you may self-guard the route if desired)
+- `video_edit` – Video trimming interface
+- `tag_edit` – Tag editing controls in file edit views
+
+Disabled features:
+1. Navigation links are hidden automatically.
+2. Protected routes (e.g. `adventure`) return `404` JSON error when disabled.
+3. Templates can check availability with `feature_enabled('feature_name')`.
+
+To disable Adventure mode, set `"adventure": false` and restart the app. Visiting `/adventure` or calling `/api/adventure-start` will return a 404 response.
+
+Environment override:
+
+```bash
+export GALLERY_CONFIG=/path/to/custom_config.json
+python app.py
+```
+
+If the config file is missing or malformed, the app falls back to enabling all features by default.
 
 ## Security Notes
 
@@ -148,6 +197,51 @@ This project is open source and available under the MIT License.
 - **Duplicate Prevention**: Automatically detects and prevents duplicate uploads based on filename and size
 
 ## Video Editing
+## Pagination
+
+The gallery supports page-based navigation. Parameters:
+
+- `page`: 1-based page number (default: 1)
+- `count`: items per page (10, 25, 50)
+- `type`: `both`, `image`, or `video`
+- `sort`: `newest`, `oldest`, `top`, or `random`
+- `tag`: optional tag name filter
+
+Example:
+
+```
+/ ?type=image&sort=top&count=25&page=2
+```
+
+Fullscreen view supports keyboard navigation (ArrowLeft / ArrowRight) cycling within the currently loaded page.
+
+## Like Count Export & Reset
+
+You can export the current like counts for all media files and optionally reset them.
+
+### Export CSV
+
+Downloads a file `media_likes.csv` containing columns:
+
+`id, original_filename, filename, file_type, like_count, created_at`
+
+Example:
+
+```bash
+curl -o media_likes.csv http://localhost:5002/api/export-likes
+```
+
+### Reset All Like Counts
+
+Sets every `MediaFile.like_count` to `0`.
+
+```bash
+curl -X POST http://localhost:5002/api/reset-likes
+```
+
+Response: `{"success": true, "affected": <number>, "message": "Reset like counts for <number> media files."}`
+
+
 - Trim video files by specifying start and end points
 - Preview video trimming results before saving
 - Supported formats: MP4, AVI, MOV, WebM, MKV

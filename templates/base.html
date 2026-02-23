@@ -71,9 +71,15 @@
                 </div>
                 <div class="flex space-x-4">
                     <a href="/" class="text-blue-600 hover:text-blue-800 font-medium">Gallery</a>
+                    {% if feature_enabled('random') %}
                     <a href="/random" class="text-blue-600 hover:text-blue-800 font-medium">Random Viewer</a>
+                    {% endif %}
+                    {% if feature_enabled('compare') %}
                     <a href="/compare" class="text-blue-600 hover:text-blue-800 font-medium">Compare</a>
+                    {% endif %}
+                    {% if feature_enabled('adventure') %}
                     <a href="/adventure" class="text-blue-600 hover:text-blue-800 font-medium">Adventure</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
